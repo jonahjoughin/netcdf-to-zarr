@@ -1,10 +1,10 @@
 import math
 
 import numpy as np
-import xarray as xr
 import zarr
 from netCDF4 import Dataset
 
+# Convert NetCDF files to Zarr store
 def netcdf_to_zarr(datasets, store, append_axis):
     root = zarr.group(store=store, overwrite = True)
     for i, ds in enumerate(datasets):
@@ -15,7 +15,7 @@ def netcdf_to_zarr(datasets, store, append_axis):
         else:
             __append_vars(ds, root, append_axis)
 
-
+# Convert non-json-encodable types to built-in types
 def __json_encode(val):
     if isinstance(val, np.integer):
         return int(val)
@@ -26,14 +26,17 @@ def __json_encode(val):
     else:
         return val
 
+# Return attributes as dict
 def __dsattrs(dataset):
         # JSON encode attributes so they can be serialized
         return {key: __json_encode(getattr(dataset, key)) for key in dataset.ncattrs() }
 
+# Set file metadata
 def __set_meta(dataset, group):
     for key, value in __dsattrs(dataset).items():
         group.attrs[key] = value
 
+# Set dimensions
 def __set_dims(dataset, group):
     for name, dim in dataset.dimensions.items():
         # Fill dimension array
@@ -46,6 +49,7 @@ def __set_dims(dataset, group):
         # Set dimension attrs
         group[name].attrs['_ARRAY_DIMENSIONS'] = [name]
 
+# Calculate chunk size for variable
 def __get_var_chunks(var, max_size):
     chunks = []
     # TODO: Improve chunk size calculation
@@ -56,7 +60,7 @@ def __get_var_chunks(var, max_size):
 
     return tuple(chunks)
 
-
+# Set variable data, including dimensions and metadata
 def __set_vars(dataset, group):
     for name, var in dataset.variables.items():
         group.create_dataset(name, \
@@ -69,6 +73,7 @@ def __set_vars(dataset, group):
             group[name].attrs[key] = value
         group[name].attrs['_ARRAY_DIMENSIONS'] = list(var.dimensions)
 
+# Append data to existing variable
 def __append_vars(dataset, group, dim):
     group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
     for name, var in dataset.variables.items():
