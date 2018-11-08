@@ -1,0 +1,10 @@
+name: netcdf-to-zarr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - boto3
+  - botocore
+  - netCDF4
+  - numpy
+  - zarr
