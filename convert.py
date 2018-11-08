@@ -75,12 +75,3 @@ def __append_vars(dataset, group, dim):
         if dim in var.dimensions:
             axis = group[name].attrs['_ARRAY_DIMENSIONS'].index(dim)
             group[name].append(var, axis)
-
-ds = Dataset('data/wrfout_d01_2000-01-01_00_00_00.nc')
-store = zarr.DirectoryStore('store.zarr')
-# netCDF_to_zarr(datasets, store, "Time")
-
-root = zarr.group(store=store, overwrite = True)
-__set_meta(ds,root)
-__set_dims(ds,root)
-__set_vars(ds,root)
