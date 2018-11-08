@@ -1,8 +1,10 @@
 # netCDF to Zarr
 
+This repository contains code for converting code netCDF files to Zarr stores. Basic examples follow below.
+
 ## Examples
 
-### List of files
+### List of Files
 
 ```python
 import zarr
@@ -15,7 +17,7 @@ store = zarr.DirectoryStore('store.zarr')
 netcdf_to_zarr([ds_1, ds_2], store, 'Time')
 ```
 
-### Files in S3
+### List of Files in S3
 
 ```python
 import zarr
@@ -23,7 +25,6 @@ from netCDF4 import Dataset
 
 from convert import netcdf_to_zarr
 from iterators import S3BasicIterator
-
 
 # Iterate through S3 files without downloading all at once
 ds_iterator = iter(S3BasicIterator('bucket_name', ['key_1', 'key_2'], 'path_to_download_folder'))
