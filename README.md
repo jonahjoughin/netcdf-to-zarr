@@ -1,4 +1,4 @@
-# netCDF to Zarr
+# NetCDF to Zarr
 
 This repository contains code for converting code netCDF files to Zarr stores. Basic examples follow below.
 
