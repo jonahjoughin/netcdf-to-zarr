@@ -3,6 +3,7 @@ import math
 import numpy as np
 import zarr
 from netCDF4 import Dataset
+from concurrency import threaded
 
 # Convert NetCDF files to Zarr store
 def netcdf_to_zarr(datasets, store, append_axis):
@@ -33,21 +34,28 @@ def __dsattrs(dataset):
 
 # Set file metadata
 def __set_meta(dataset, group):
-    for key, value in __dsattrs(dataset).items():
-        group.attrs[key] = value
+    print("Set meta")
+    group.attrs.put(__dsattrs(dataset));
+
+@threaded
+def __set_dim(group, name, dim):
+    print("Set dim")
+    group.create_dataset(name, \
+        data=np.arange(dim.size), \
+        shape=(dim.size,), \
+        chunks=(1<<16,) if dim.isunlimited() else (dim.size,), \
+        dtype=np.int32 \
+    )
+    # Set dimension attrs
+    group[name].attrs['_ARRAY_DIMENSIONS'] = [name]
 
 # Set dimensions
 def __set_dims(dataset, group):
-    for name, dim in dataset.dimensions.items():
-        # Fill dimension array
-        group.create_dataset(name, \
-            data=np.arange(dim.size), \
-            shape=(dim.size,), \
-            chunks=(1<<16,) if dim.isunlimited() else (dim.size,), \
-            dtype=np.int32 \
-        )
-        # Set dimension attrs
-        group[name].attrs['_ARRAY_DIMENSIONS'] = [name]
+    threads = [__set_dim(group, name, dim) for name, dim in dataset.dimensions.items()]
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
+
 
 # Calculate chunk size for variable
 def __get_var_chunks(var, max_size):
@@ -61,22 +69,37 @@ def __get_var_chunks(var, max_size):
     return tuple(chunks)
 
 # Set variable data, including dimensions and metadata
+
+@threaded
+def __set_var(group, name, var):
+    print("Setting " + name)
+    group.create_dataset(name, \
+        data=var, \
+        shape=var.shape, \
+        chunks=(__get_var_chunks(var, 2<<24)), \
+        dtype=var.dtype \
+    )
+    attrs = __dsattrs(var)
+    attrs['_ARRAY_DIMENSIONS'] = list(var.dimensions)
+    group[name].attrs.put(attrs);
+
 def __set_vars(dataset, group):
-    for name, var in dataset.variables.items():
-        group.create_dataset(name, \
-            data=var, \
-            shape=var.shape, \
-            chunks=(__get_var_chunks(var, 2<<24)), \
-            dtype=var.dtype \
-        )
-        for key, value in __dsattrs(var).items():
-            group[name].attrs[key] = value
-        group[name].attrs['_ARRAY_DIMENSIONS'] = list(var.dimensions)
+    threads = [__set_var(group, name, var) for name, var in dataset.variables.items()]
+    for thread in threads:
+        thread.join()
+
 
 # Append data to existing variable
+
+@threaded
+def __append_var(group, name, var, dim):
+    print("Appending " + name)
+    if dim in var.dimensions:
+        axis = group[name].attrs['_ARRAY_DIMENSIONS'].index(dim)
+        group[name].append(var, axis)
+
 def __append_vars(dataset, group, dim):
     group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
-    for name, var in dataset.variables.items():
-        if dim in var.dimensions:
-            axis = group[name].attrs['_ARRAY_DIMENSIONS'].index(dim)
-            group[name].append(var, axis)
+    threads = [__append_var(group, name, var, dim) for name, var in dataset.variables.items()]
+    for thread in threads:
+        thread.join()

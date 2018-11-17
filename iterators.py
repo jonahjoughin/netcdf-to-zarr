@@ -35,4 +35,6 @@ class S3BasicIterator(object):
             self.i += 1
             return Dataset(download_path)
         else:
+            previous_file_path = os.path.join(self.path, self.files[self.i-1])
+            os.remove(previous_file_path)
             raise StopIteration
