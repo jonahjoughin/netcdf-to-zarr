@@ -7,4 +7,5 @@ dependencies:
   - botocore
   - netCDF4
   - numpy
+  - s3fs
   - zarr

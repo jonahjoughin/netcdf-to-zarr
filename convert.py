@@ -4,6 +4,7 @@ import numpy as np
 import zarr
 from netCDF4 import Dataset
 from concurrency import threaded
+from concurrent.futures import ThreadPoolExecutor
 
 # Convert NetCDF files to Zarr store
 def netcdf_to_zarr(datasets, store, append_axis):
@@ -37,7 +38,6 @@ def __set_meta(dataset, group):
     print("Set meta")
     group.attrs.put(__dsattrs(dataset));
 
-@threaded
 def __set_dim(group, name, dim):
     print("Set dim")
     group.create_dataset(name, \
@@ -51,10 +51,9 @@ def __set_dim(group, name, dim):
 
 # Set dimensions
 def __set_dims(dataset, group):
-    threads = [__set_dim(group, name, dim) for name, dim in dataset.dimensions.items()]
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for name, dim in dataset.dimensions.items():
+            executor.submit(__set_dim, group, name, dim)
 
 
 # Calculate chunk size for variable
@@ -70,7 +69,6 @@ def __get_var_chunks(var, max_size):
 
 # Set variable data, including dimensions and metadata
 
-@threaded
 def __set_var(group, name, var):
     print("Setting " + name)
     group.create_dataset(name, \
@@ -84,14 +82,14 @@ def __set_var(group, name, var):
     group[name].attrs.put(attrs);
 
 def __set_vars(dataset, group):
-    threads = [__set_var(group, name, var) for name, var in dataset.variables.items()]
-    for thread in threads:
-        thread.join()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for name, var in dataset.variables.items():
+            executor.submit(__set_var, group, name, var)
 
 
 # Append data to existing variable
 
-@threaded
 def __append_var(group, name, var, dim):
     print("Appending " + name)
     if dim in var.dimensions:
@@ -100,6 +98,7 @@ def __append_var(group, name, var, dim):
 
 def __append_vars(dataset, group, dim):
     group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
-    threads = [__append_var(group, name, var, dim) for name, var in dataset.variables.items()]
-    for thread in threads:
-        thread.join()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        for name, var in dataset.variables.items():
+            executor.submit(__append_var, group, name, var, dim)
