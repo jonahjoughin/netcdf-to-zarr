@@ -110,8 +110,8 @@ def __append_var(ds, group, name, dim_name):
 
 def __append_vars(ds, group, dim):
     print("Append vars")
-    group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
     dataset = Dataset(ds)
+    group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
 
     with ProcessPoolExecutor(max_workers=8) as executor:
         for name, var in dataset.variables.items():
