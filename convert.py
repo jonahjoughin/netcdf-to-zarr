@@ -5,6 +5,7 @@ import zarr
 from netCDF4 import Dataset
 from concurrency import threaded
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 # Convert NetCDF files to Zarr store
 def netcdf_to_zarr(datasets, store, append_axis):
@@ -33,13 +34,18 @@ def __dsattrs(dataset):
         # JSON encode attributes so they can be serialized
         return {key: __json_encode(getattr(dataset, key)) for key in dataset.ncattrs() }
 
-# Set file metadata
-def __set_meta(dataset, group):
-    print("Set meta")
-    group.attrs.put(__dsattrs(dataset));
+def __get_dataset(ds):
+    return Dataset(ds)
 
-def __set_dim(group, name, dim):
+# Set file metadata
+def __set_meta(ds, group):
+    print("Set meta")
+    group.attrs.put(__dsattrs(Dataset(ds)));
+
+def __set_dim(ds, group, name):
     print("Set dim")
+    dataset = Dataset(ds)
+    dim = dataset.dimensions[name]
     group.create_dataset(name, \
         data=np.arange(dim.size), \
         shape=(dim.size,), \
@@ -50,10 +56,11 @@ def __set_dim(group, name, dim):
     group[name].attrs['_ARRAY_DIMENSIONS'] = [name]
 
 # Set dimensions
-def __set_dims(dataset, group):
-    with ThreadPoolExecutor(max_workers=8) as executor:
+def __set_dims(ds, group):
+    dataset = Dataset(ds)
+    with ProcessPoolExecutor(max_workers=8) as executor:
         for name, dim in dataset.dimensions.items():
-            executor.submit(__set_dim, group, name, dim)
+            executor.submit(__set_dim, ds, group, name)
 
 
 # Calculate chunk size for variable
@@ -69,8 +76,10 @@ def __get_var_chunks(var, max_size):
 
 # Set variable data, including dimensions and metadata
 
-def __set_var(group, name, var):
+def __set_var(ds, group, name):
     print("Setting " + name)
+    dataset = Dataset(ds)
+    var = dataset.variables[name]
     group.create_dataset(name, \
         data=var, \
         shape=var.shape, \
@@ -81,24 +90,29 @@ def __set_var(group, name, var):
     attrs['_ARRAY_DIMENSIONS'] = list(var.dimensions)
     group[name].attrs.put(attrs);
 
-def __set_vars(dataset, group):
-
-    with ThreadPoolExecutor(max_workers=8) as executor:
+def __set_vars(ds, group):
+    dataset = Dataset(ds)
+    print("Set vars")
+    with ProcessPoolExecutor(max_workers=8) as executor:
         for name, var in dataset.variables.items():
-            executor.submit(__set_var, group, name, var)
+            executor.submit(__set_var, ds, group, name)
 
 
 # Append data to existing variable
 
-def __append_var(group, name, var, dim):
+def __append_var(ds, group, name, dim_name):
     print("Appending " + name)
-    if dim in var.dimensions:
-        axis = group[name].attrs['_ARRAY_DIMENSIONS'].index(dim)
+    dataset = Dataset(ds)
+    var = dataset.variables[name]
+    if dim_name in var.dimensions:
+        axis = group[name].attrs['_ARRAY_DIMENSIONS'].index(dim_name)
         group[name].append(var, axis)
 
-def __append_vars(dataset, group, dim):
+def __append_vars(ds, group, dim):
+    print("Append vars")
     group[dim].append(np.arange(group[dim].size, group[dim].size + dataset.dimensions[dim].size))
+    dataset = Dataset(ds)
 
-    with ThreadPoolExecutor(max_workers=8) as executor:
+    with ProcessPoolExecutor(max_workers=8) as executor:
         for name, var in dataset.variables.items():
-            executor.submit(__append_var, group, name, var, dim)
+            executor.submit(__append_var, ds, group, name, dim)

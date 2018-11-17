@@ -33,7 +33,7 @@ class S3BasicIterator(object):
             if not os.path.exists(download_path):
                 self.s3.Bucket(self.bucket).download_file(self.files[self.i], download_path)
             self.i += 1
-            return Dataset(download_path)
+            return download_path
         else:
             previous_file_path = os.path.join(self.path, self.files[self.i-1])
             os.remove(previous_file_path)
