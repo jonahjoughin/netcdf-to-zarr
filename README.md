@@ -12,7 +12,7 @@ from netCDF4 import Dataset
 
 from convert import netcdf_to_zarr
 
-ds_1, ds_2 = Dataset('path_to_ds_1.nc'), Dataset('path_to_ds_2.nc')
+ds_1, ds_2 = 'path_to_ds_1.nc', 'path_to_ds_2.nc'
 store = zarr.DirectoryStore('store.zarr')
 netcdf_to_zarr([ds_1, ds_2], store, 'Time')
 ```
